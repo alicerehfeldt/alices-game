@@ -2,6 +2,14 @@
 
 A server for running game things
 
+## TODO
+
+* Add way to get list of supported games via websocket event
+* Add way to get list of players via websocket event
+* Add persistent storage for game data via redis
+* Clean up readme with API for game server
+* Probably a bunch of missing or broken stuff to fix
+
 #### How to run
 
 `make start`

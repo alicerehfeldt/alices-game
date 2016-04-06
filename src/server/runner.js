@@ -29,6 +29,10 @@ class Runner {
 
   // Called by index.js when player connects
   newPlayer(player, socket) {
+    if (!player || !player.id) {
+      this._error(`newPlayer sent bad player ${player}`);
+      return;
+    }
     let playerId = player.id;
     this.players[playerId] = player;
     this.playerSockets[playerId] =  socket;
@@ -54,30 +58,49 @@ class Runner {
     let gameId = getNextGameId();
 
     let serverDependency = {
-      requestPlayerInput: function(pId, data) {
-        this._requestPlayerInput(gameId, pId, data);
+      getPlayer: (pId) => {
+        let rPlayer = this.players[pId];
+        this._log(`getPlayer ${pId} ${rPlayer}`);
+        return rPlayer ? rPlayer : false;
       },
 
-      updateGameData: function(data) {
+      requestPlayerInput: (pId, data) => {
+        this._requestPlayerInput(pId, data);
+      },
+
+      updateGameData: (data) => {
         this._updateGameData(gameId, data);
       },
 
-      triggerMainLoop: function() {
-        this._triggerMainLoop(gameId);
+      triggerMainLoop: (game) => {
+        this._triggerMainLoop(game);
+      },
+
+      gameOver: (data) => {
+        this._gameOver(gameId, data);
       }
     }
-    let server = new gameObject.server(serverDependency, gameId, playerId, playerIds);
-    // This is a weird place to do this, but whatever
-    server.type = type;
-    this.runningGames[gameId] =  server;
+    let gameInfo = {
+      gameId: gameId,
+      type: type,
+      ownerId: playerId,
+      playerIds: playerIds
+    }
 
-    this._connectPlayerToGame(playerId, gameId);
+    let server = new gameObject.server(serverDependency, gameInfo);
+    this.runningGames[gameId] =  server;
+    server.initialSetup();
+
     this.gamePlayersMap[gameId] =  playerIds;
 
     playerIds.forEach((pId) => {
       pId = pId + '';
       this.playerGameMap[pId] =  gameId;
+      if (this.playerSockets[pId]) {
+        this._connectPlayerToGame(pId, gameId);
+      }
     });
+
 
     // TODO: Send game created event to each player's sockets (if we have them)
   }
@@ -91,16 +114,17 @@ class Runner {
 
     socket.on('playerInput', (data) => {
       let player = this.players[playerId];
-      let game = this._getRunningGameForPlayer(playerId);
-      if (!player || !game) {
+      let gameId = this._getRunningGameIdForPlayer(playerId);
+      if (!player || !gameId) {
         return;
       }
+      let game = this.runningGames[gameId];
+      this._log(`playerInput ${playerId} ${data}`);
       game.inputReceived(player, data);
     });
 
     socket.on('disconnect', () => {
-      let player = this.players[playerId];
-      this._playerDisconnected(player);
+      this._playerDisconnected(playerId);
     });
   }
 
@@ -115,8 +139,6 @@ class Runner {
       return;
     }
 
-    game.playerConnected(player);
-
     // Get current game data
     let gameData = game.getCurrentGameData();
     let gameType = game.type;
@@ -127,39 +149,82 @@ class Runner {
       gameData: gameData
     };
     this._emit(playerId, 'connectedToGame', packet);
+
+    game._connectPlayer(player);
   }
 
 
   // called by game to send input to player
-  _requestPlayerInput(gameId, playerId, data) {
-
+  _requestPlayerInput(playerId, data) {
+    this._emit(playerId, 'inputRequested', data);
   }
 
   // called by game to send new data to all players
   _updateGameData(gameId, data) {
+    let players = this.gamePlayersMap[gameId];
+    if (!players) {
+      return;
+    }
 
+    this._log(`_updateGameData ${gameId} ${data}`);
+    players.forEach((playerId) => {
+      // If we have a socket for them
+      if (this.playerSockets[playerId]) {
+        this._emit(playerId, 'gameDataUpdate', data);
+      }
+    });
+  }
+
+  // Called by game to signal game over
+  _gameOver(gameId, data) {
+    let players = this.gamePlayersMap[gameId];
+    if (!players) {
+      return;
+    }
+    this._log(`_gameOver ${gameId}, ${data}`);
+    players.forEach((playerId) => {
+      // If we have a socket for them
+      if (this.playerSockets[playerId]) {
+        this._emit(playerId, 'gameOver', data);
+      }
+    });
+
+    // TODO: Clean up running game here?
   }
 
 
   // Called by game to trigger its main game loop
   // Done this way so we can gracefully handle the setTimeout return stuff
-  _triggerMainLoop(gameId) {
+  _triggerMainLoop(game) {
+    let sleep = game.mainLoop();
 
+    if (typeof sleep === 'number') {
+      sleep = parseInt(sleep, 10);
+      setTimeout(() => {
+        this._triggerMainLoop(game);
+      }, sleep);
+    }
   }
 
   // Called when player socket sends a disconnect event
-  _playerDisconnected(player) {
+  _playerDisconnected(playerId) {
+    let player = this.players[playerId];
+    let gameId = this._getRunningGameIdForPlayer(playerId);
+    this._log(`_playerDisconnected ${playerId} ${gameId}`);
+    if (gameId) {
+      let game = this.runningGames[gameId];
+      if (game) {
+        game._disconnectPlayer(player);
+      }
+    }
 
+    delete this.playerSockets[playerId];
   }
 
-  _getGame(gameId) {
-    let game = this.runningGames[gameId];
-    return game ? game : false;
-  }
 
   _getRunningGameIdForPlayer(playerId) {
     let gameId = this.playerGameMap[playerId];
-    this._log(`_getRunningGameIdForPlayer ${playerId} ${gameId}`);
+    //this._log(`_getRunningGameIdForPlayer ${playerId} ${gameId}`);
     return gameId ? gameId : false;
   }
 
@@ -168,7 +233,7 @@ class Runner {
   }
 
   _emit(playerId, type, data) {
-    this._log(`_emit ${playerId} ${type} ${data}`);
+    this._log(`_emit ${playerId} ${type}`);// ${JSON.stringify(data)}`);
     let playerSocket = this.playerSockets[playerId];
     if (!playerSocket) {
       this._error(`Could not emit for ${playerId}, could not find socket`);

@@ -6,6 +6,8 @@ let io = require('socket.io')(http);
 let Runner = require('./server/runner');
 
 let runner = new Runner();
+// nobody sees this
+io.set('origins', '*:*');
 
 io.on('connection', (socket) => { 
   console.log(colors.green('[SERVER] New socket connection!'));
