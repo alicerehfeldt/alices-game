@@ -1,3 +1,13 @@
 {
-
+  "name": "alices-game-server",
+  "repository": "https://github.com/alicerehfeldt/alices-game-server",
+  "license": "none",
+  "version": "0.0.0",
+  "scripts": {
+    "start": "node --harmony src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.10.2",
+    "socket.io": "^1.4.5"
+  }
 }
