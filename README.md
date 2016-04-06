@@ -2,11 +2,11 @@
 
 A server for running game things
 
-## How to run
+#### How to run
 
 `make start`
 
-## How to develop
+#### How to develop
 
 `make develop`
 
@@ -48,6 +48,8 @@ Sent when the game is prompting the player for input
 General error has occurred
 
 * `{String} message` - Error message
+
+***
 
 ### Client -> Server
 

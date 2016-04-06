@@ -4,7 +4,7 @@
   "license": "none",
   "version": "0.0.0",
   "scripts": {
-    "start": "node --harmony src/index.js"
+    "start": "make start"
   },
   "dependencies": {
     "colors": "^1.1.2",
