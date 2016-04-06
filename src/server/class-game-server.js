@@ -1,5 +1,5 @@
 'use strict';
-
+let colors = require('colors');
 
 class GameServer {
   constructor(runner, gameId, gameOwnerId, playerIds) {
@@ -11,10 +11,6 @@ class GameServer {
   }
 
   initialSetup() {
-    // To be implemented by the game
-  }
-
-  playerAdded(player) {
     // To be implemented by the game
   }
 
@@ -31,11 +27,17 @@ class GameServer {
   }
 
   playerConnected(player) {
-
+    // To be implemented by the game
   }
 
   playerDisconnected(player) {
     // To be implemented by the game
+  }
+
+  getCurrentGameData() {
+    // To be implemented by the game
+    // Super naive implementation here
+    return this.gameData
   }
 
   updateGameData(data, persist) {
@@ -46,7 +48,8 @@ class GameServer {
   }
 
   persistData(data) {
-    // TODO: Put this in redis or something
+    // To be implemented by the game
+    this.gameData = data;
   }
 
   promptForInput(playerId, data) {
@@ -60,7 +63,7 @@ class GameServer {
 
 
   _log(message) {
-    console.log(`[GAME][${this.gameInfo.name}][${this.gameInfo.id}]`, message);
+    console.log(colors.magenta(`[GAME][${this.gameInfo.name}][${this.gameInfo.id}] ${message}`));
   }
 
 }
